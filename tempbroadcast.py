@@ -4,6 +4,13 @@ import forecastio
 import datetime
 import socket
 
+'''
+    This module connects to the Forecast.io web service, obtains the current conditions,
+    and then transmits the current temperature to a Crestron processor over UDP. 
+
+    Much more information is available from Forecast.io if desired.
+'''
+
 def main():
 
 	api_key = "YOUR_API_KEY_HERE"
