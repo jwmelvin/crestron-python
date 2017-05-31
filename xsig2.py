@@ -18,62 +18,95 @@ def startServe(port=60001, dictionary=dict()):
 
     #the next two lines go together to 
         # instantiate the server 
-    server = XsigServer('',port,dictionary)
+#     server = XsigServer('',port,dictionary)
+    server = XsigServer('',port)
         # and start its asynchronous loop
     asyncore.loop()
 
+    # alternative server
+    # listens on UDP
+    #server = XsigServerUDP('', 60001)
+
 # XsigHandler is the main class for listening to the port and interpreting data when received
 class XsigHandler(asyncore.dispatcher_with_send):
-    def __init__(self, sock, dictionary):
-        self.dictionary = dictionary
-        asyncore.dispatcher_with_send.__init__(self, sock)
+#     def __init__(self, dictionary):
+#         self.dictionary = dictionary
+#         asyncore.dispatcher_with_send.__init__(self)
     
     def handle_read(self):
-#        print ('handle_read')
+        print ('handle_read')
         data = self.recv(8192)
-#        print (data)
+        print (data)
         while data:
             #detect and triage to parsing
             if data[0] & 0b11000000 == 0b10000000:
-                value = dig2bool(data[:2])
-                print('digital' + str(value))
-                key = 'd' + str(value[0])
-                self.dictionary[key] = True if value[1]==1 else False
+                print ('digital')
+                print (dig2bool ( data[:2] ))
                 data = data[2:]
-
+                # put certain results in the dictionary
             elif data[0] & 0b11001000 == 0b11000000:
-                value = alg2int ( data[:4] )
-                print ('analog' + str(value))
-                key = 'a' + str(value[0])
-                self.dictionary[key] = value[1]
+                print ('analog')
+                print (alg2int ( data[:4] ))
                 data = data[4:]
-
             elif data[0] & 0b11001000 == 0b11001000:
+                print ('serial')
                 end = data.find(b'\xff') + 1
-                value = ser2str ( data[:end])
-                print ('serial' + str(value))
-                key = 's' + str(value[0])
-                self.dictionary[key] = value[1]
+                print (ser2str ( data[:end]))
                 data = data[end:]
-
             else:
                 print ('something else:')
                 print (data)
                 data = ''
 
 class XsigServer(asyncore.dispatcher):
-    def __init__(self, host, port, dictionary=dict()):
+#     def __init__(self, host, port, dictionary=dict()):
+    def __init__(self, host, port):
         asyncore.dispatcher.__init__(self)
-        self.dictionary = dictionary
+#         self.dictionary = dictionary
         self.create_socket(socket.AF_INET, socket.SOCK_STREAM)
         self.set_reuse_addr()
         self.bind((host,port))
         self.listen(5)
 
+#     def handle_accept(self):
+#         pair = self.accept()
+#         if pair is not None:
+#             sock, addr = pair
+#             print ('Incoming connection from %s' % repr(addr))
+#             handler = XsigHandler(sock, self.dictionary)
+
     def handle_accepted(self, sock, addr):
         print ('Incoming connection from %s' % repr(addr))
-        handler = XsigHandler(sock, self.dictionary)
+#         handler = XsigHandler(sock, self.dictionary)
+        handler = XsigHandler(sock)
 
+
+# simple test UDP server to just report incoming data
+class XsigServerUDP(asyncore.dispatcher):
+    def __init__(self, host, port):
+        asyncore.dispatcher.__init__(self)
+        self.create_socket(socket.AF_INET, socket.SOCK_DGRAM)
+        # self.set_reuse_addr()
+        print ('binding {0}:{1}'.format( host , port))
+        self.bind((host,port))
+        # self.listen(5)
+    
+    def handle_connect(self):
+        print ('UDP server started...')
+
+    def handle_read(self):
+        data, addr = self.recvfrom(2048)
+        print (str(addr)+" >> "+data)
+
+    def handle_write(self):
+        pass
+
+    # def handle_accept(self):
+        # pair = self.accept()
+        # if pair is not None:
+            # sock, addr = pair
+            # print 'Incoming connection from %s' % repr(addr)
+            # handler = XsigHandler(sock)
 
 '''
     The following methods convert data from one type to the other (Python vs. Crestron).
